@@ -1,5 +1,4 @@
 use std::fs;
-use zed::lsp::CompletionKind;
 use zed::{CodeLabel, CodeLabelSpan, LanguageServerId};
 use zed_extension_api::{self as zed, Result};
 
@@ -109,27 +108,28 @@ impl zed::Extension for VExtension {
 		_language_server_id: &LanguageServerId,
 		completion: zed::lsp::Completion,
 	) -> Option<zed::CodeLabel> {
-		let ty = match completion.kind {
-			Some(zed::lsp::CompletionKind::Function) | Some(zed::lsp::CompletionKind::Method) => {
-				match completion.detail {
-					Some(a) => a,
-					_ => completion.label
-				}
+		let (label, start_idx) = match (completion.kind, completion.detail) {
+			(_, None) => (completion.label, 0),
+			(Some(zed::lsp::CompletionKind::Function), Some(a)) => (a, 3),
+			(Some(zed::lsp::CompletionKind::Method), Some(a)) => {
+				let pure = after_first(&a, ')').unwrap_or(a)[1..].to_string();
+				(format!("fn {}", pure), 3)
 			},
-			_ => {
-				match completion.detail {
-						Some(a) => format!("{} {}", completion.label, a),
-						_ => completion.label
-					}
-			}
+			(_, Some(a)) => (format!("{} {}", completion.label, a), 0),
 		};
 
 		Some(CodeLabel {
-			spans: vec![CodeLabelSpan::code_range(0..ty.len())],
-			filter_range: (0..ty.len()).into(),
-			code: ty,
+			spans: vec![CodeLabelSpan::code_range(start_idx..label.len())],
+			filter_range: (0..label.len() - start_idx).into(),
+			code: label,
 		})
 	}
+}
+
+fn after_first(in_string: &str, delim: char) -> Option<String> {
+	let mut splitter = in_string.splitn(2, delim);
+	splitter.next()?;
+	Some(splitter.next()?.to_string())
 }
 
 zed::register_extension!(VExtension);
