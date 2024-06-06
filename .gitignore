@@ -3,3 +3,4 @@ grammars
 *.wasm
 target
 Cargo.lock
+test.v
