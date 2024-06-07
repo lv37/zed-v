@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ZED_EXTENSION_CLI_SHA: 5ef75919f09e31c28b75c09e695946b6c4d9c3ee
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          clean: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Cache zed-extension CLI
+        id: cache-zed-extension
+        uses: actions/cache@v3
+        with:
+          path: |
+            zed-extension
+          key: zed-extension-${{ env.ZED_EXTENSION_CLI_SHA }}
+
+      - name: Download zed-extension CLI if not cached
+        if: steps.cache-zed-extension.outputs.cache-hit != 'true'
+        run: |
+          wget --quiet "https://zed-extension-cli.nyc3.digitaloceanspaces.com/$ZED_EXTENSION_CLI_SHA/x86_64-unknown-linux-gnu/zed-extension"
+          chmod +x zed-extension
+
+      - name: Build
+        run: |
+          mkdir ./scratch || echo -n
+          ./zed-extension --source-dir . --output-dir ./build --scratch-dir ./scratch
+
+      - name: Cache extension build dependencies
+        uses: actions/cache@v3
+        with:
+          key: cache-build-dependencies
+          path: |
+            ./scratch
