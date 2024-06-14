@@ -2,6 +2,9 @@
 
 This extension adds support for the [V programming language](https://vlang.org/) to the [Zed editor](https://zed.dev).
 
+## Language Server Support
+This extension automatically tries to download [`v-analyzer`](https://github.com/vlang/v-analyzer). If the download keeps failing, you must manually install [`v-analyzer`](https://github.com/vlang/v-analyzer).
+
 ## Runnables
 By default `runnables` won't do anything as they only run appropriately tagged tasks.
 To use runnables, you must add one of these supported tags to your tasks:
