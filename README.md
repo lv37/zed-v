@@ -2,6 +2,12 @@
 
 This extension adds support for the [V programming language](https://vlang.org/) to the [Zed editor](https://zed.dev).
 
+## Installation
+
+1. Open Zed
+2. Press `ctrl`+`shift`+`x` or `cmd`+`shift`+`x` to open the extension menu
+3. Search for `v` and click on install
+
 ## Language Server Support
 This extension automatically tries to download [`v-analyzer`](https://github.com/vlang/v-analyzer). If the download keeps failing, you must manually install [`v-analyzer`](https://github.com/vlang/v-analyzer).
 
