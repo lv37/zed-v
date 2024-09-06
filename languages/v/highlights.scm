@@ -43,6 +43,7 @@
  ;"atomic"
  "break"
  "const"
+ "__global"
  "continue"
  "defer"
  "else"
