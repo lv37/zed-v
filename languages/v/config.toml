@@ -1,7 +1,7 @@
 name = "V"
 grammar = "v"
 path_suffixes = ["v", "vv", "mod"]
-first_line_pattern = '^#!.*\bnode\b'
+first_line_pattern = '^#![^\\n]+'
 line_comments = ["// "]
 autoclose_before = ";:.,=}])>"
 brackets = [
@@ -16,10 +16,3 @@ brackets = [
 ]
 word_characters = ["$", "#"]
 tab_size = 2
-
-[overrides.element]
-line_comments = { remove = true }
-block_comment = ["{/*", "*/}"]
-
-[overrides.string]
-word_characters = ["-"]
