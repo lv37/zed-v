@@ -6,81 +6,101 @@ struct VExtension {
 	cached_binary_path: Option<String>,
 }
 
+fn try_local_install<T>(err: T, worktree: &zed::Worktree) -> Result<String, T> {
+	if let Some(path) = worktree.which("v-analyzer") {
+		return Ok(path);
+	}
+	return Err(err);
+}
+
+fn language_server_binary_path_no_fallback(
+	selff: &mut VExtension,
+	language_server_id: &LanguageServerId,
+	worktree: &zed::Worktree,
+) -> Result<String> {
+	if let Some(cache) = selff.cached_binary_path.clone() {
+		if let Some(local) = worktree.which("v-analyzer") {
+			if local != cache && fs::metadata(&cache).map_or(false, |stat| stat.is_file()) {
+				return Ok(cache);
+			}
+		} else {
+			return Ok(cache);
+		}
+	}
+
+	let (platform, arch) = zed::current_platform();
+	zed::set_language_server_installation_status(
+		&language_server_id,
+		&zed::LanguageServerInstallationStatus::CheckingForUpdate,
+	);
+
+	let asset_name = format!(
+		"v-analyzer-{os}-{arch}{extension}",
+		arch = match arch {
+			zed::Architecture::Aarch64 => "arm64",
+			zed::Architecture::X86 => "x86",
+			zed::Architecture::X8664 => "x86_64",
+		},
+		os = match platform {
+			zed::Os::Mac => "darwin",
+			zed::Os::Linux => "linux",
+			zed::Os::Windows => "windows",
+		},
+		extension = match platform {
+			zed::Os::Windows => ".exe",
+			_ => ""
+		},
+	);
+
+	if !fs::metadata(&asset_name).map_or(false, |stat| stat.is_file()) {
+		zed::set_language_server_installation_status(
+			&language_server_id,
+			&zed::LanguageServerInstallationStatus::Downloading,
+		);
+		let release = zed::latest_github_release(
+			"lv37/v-analyzer",
+			zed::GithubReleaseOptions {
+				require_assets: true,
+				pre_release: true,
+			},
+		)?;
+
+		let asset = release
+			.assets
+			.iter()
+			.find(|asset| asset.name == asset_name)
+			.ok_or_else(|| format!("no asset found matching {:?}", asset_name))?;
+
+		zed::download_file(
+			&asset.download_url,
+			&asset_name,
+			zed::DownloadedFileType::Uncompressed,
+		)
+		.map_err(|e| format!("failed to download file: {e}"))?;
+
+		zed::make_file_executable(&asset_name)?;
+
+		let entries =
+			fs::read_dir(".").map_err(|e| format!("failed to list working directory {e}"))?;
+		for entry in entries {
+			let entry = entry.map_err(|e| format!("failed to load directory entry {e}"))?;
+			if entry.file_name().to_str() != Some(&asset_name) {
+				fs::remove_dir_all(&entry.path()).ok();
+			}
+		}
+	}
+	selff.cached_binary_path = Some(asset_name.clone());
+	Ok(asset_name)
+}
+
 impl VExtension {
 	fn language_server_binary_path(
 		&mut self,
 		language_server_id: &LanguageServerId,
 		worktree: &zed::Worktree,
 	) -> Result<String> {
-		if let Some(path) = worktree.which("v-analyzer") {
-			return Ok(path);
-		}
-
-		if let Some(path) = &self.cached_binary_path {
-			if fs::metadata(path).map_or(false, |stat| stat.is_file()) {
-				return Ok(path.clone());
-			}
-		}
-
-		let (platform, arch) = zed::current_platform();
-		zed::set_language_server_installation_status(
-			&language_server_id,
-			&zed::LanguageServerInstallationStatus::CheckingForUpdate,
-		);
-
-		let asset_name = format!(
-			"v-analyzer-{os}-{arch}.zip",
-			arch = match arch {
-				zed::Architecture::Aarch64 => "arm64",
-				zed::Architecture::X86 => "x86",
-				zed::Architecture::X8664 => "x86_64",
-			},
-			os = match platform {
-				zed::Os::Mac => "darwin",
-				zed::Os::Linux => "linux",
-				zed::Os::Windows => "windows",
-			},
-		);
-		let version_dir = asset_name.clone();
-		let binary_path = format!("{version_dir}/v-analyzer");
-
-		if !fs::metadata(&binary_path).map_or(false, |stat| stat.is_file()) {
-			zed::set_language_server_installation_status(
-				&language_server_id,
-				&zed::LanguageServerInstallationStatus::Downloading,
-			);
-			let release = zed::latest_github_release(
-				"vlang/v-analyzer",
-				zed::GithubReleaseOptions {
-					require_assets: true,
-					pre_release: false,
-				},
-			)?;
-
-			let asset = release
-			.assets
-			.iter()
-			.find(|asset| asset.name == asset_name)
-			.ok_or_else(|| format!("no asset found matching {:?}", asset_name))?;
-
-			zed::download_file(
-				&asset.download_url,
-				&version_dir,
-				zed::DownloadedFileType::Zip,
-			)
-			.map_err(|e| format!("failed to download file: {e}"))?;
-
-			let entries =
-				fs::read_dir(".").map_err(|e| format!("failed to list working directory {e}"))?;
-			for entry in entries {
-				let entry = entry.map_err(|e| format!("failed to load directory entry {e}"))?;
-				if entry.file_name().to_str() != Some(&version_dir) {
-					fs::remove_dir_all(&entry.path()).ok();
-				}
-			}
-		}
-		self.cached_binary_path = Some(binary_path.clone());
-		Ok(binary_path)
+		return language_server_binary_path_no_fallback(self, language_server_id, worktree)
+			.or_else(|a| try_local_install(a, worktree));
 	}
 }
 
@@ -114,13 +134,13 @@ impl zed::Extension for VExtension {
 			(Some(zed::lsp::CompletionKind::Method), Some(a)) => {
 				let pure = after_first(&a, ')').unwrap_or(a)[1..].to_string();
 				(format!("fn {}", pure), 3)
-			},
+			}
 			(_, Some(a)) => (format!("{} {}", completion.label, a), 0),
 		};
 
 		Some(CodeLabel {
 			spans: vec![CodeLabelSpan::code_range(start_idx..label.len())],
-			filter_range: (0..label.len() - start_idx).into(),
+			filter_range: (0..(label.len() - start_idx)).into(),
 			code: label,
 		})
 	}
