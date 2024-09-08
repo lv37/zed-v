@@ -1,6 +1,6 @@
 id = "v"
-name = "V"
-description = "V (Vlang) support."
+name = "V (Vlang)"
+description = "V language support."
 version = "0.2.0"
 schema_version = 1
 authors = ["lv37 <132778382+lv37@users.noreply.github.com>"]
