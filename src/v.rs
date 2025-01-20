@@ -3,7 +3,8 @@ use zed::{CodeLabel, CodeLabelSpan, LanguageServerId};
 use zed_extension_api::{self as zed, Result};
 
 struct VExtension {
-	cached_binary_path: Option<String>,
+	current_version: String,
+	cached_binary_path: Option<String>
 }
 
 fn try_local_install<T>(err: T, worktree: &zed::Worktree) -> Result<String, T> {
@@ -51,25 +52,27 @@ fn language_server_binary_path_no_fallback(
 			_ => ""
 		},
 	);
+	
+	let release = zed::latest_github_release(
+		"lv37/v-analyzer",
+		zed::GithubReleaseOptions {
+			require_assets: true,
+			pre_release: true,
+		},
+	)?;
+	
+	let asset = release
+		.assets
+		.iter()
+		.find(|asset| asset.name == asset_name)
+		.ok_or_else(|| format!("no asset found matching {:?}", asset_name))?;
 
-	if !fs::metadata(&asset_name).map_or(false, |stat| stat.is_file()) {
+
+	if selff.current_version != asset.download_url || !fs::metadata(&asset_name).map_or(false, |stat| stat.is_file()) {
 		zed::set_language_server_installation_status(
 			&language_server_id,
 			&zed::LanguageServerInstallationStatus::Downloading,
 		);
-		let release = zed::latest_github_release(
-			"lv37/v-analyzer",
-			zed::GithubReleaseOptions {
-				require_assets: true,
-				pre_release: true,
-			},
-		)?;
-
-		let asset = release
-			.assets
-			.iter()
-			.find(|asset| asset.name == asset_name)
-			.ok_or_else(|| format!("no asset found matching {:?}", asset_name))?;
 
 		zed::download_file(
 			&asset.download_url,
@@ -90,6 +93,7 @@ fn language_server_binary_path_no_fallback(
 		}
 	}
 	selff.cached_binary_path = Some(asset_name.clone());
+	selff.current_version = asset.download_url.clone();
 	Ok(asset_name)
 }
 
@@ -108,6 +112,7 @@ impl zed::Extension for VExtension {
 	fn new() -> Self {
 		Self {
 			cached_binary_path: None,
+			current_version: "".to_string()
 		}
 	}
 
