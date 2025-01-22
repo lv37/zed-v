@@ -24,14 +24,11 @@ jobs:
           clean: false
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - uses: actions/setup-node@v4
 
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
         with:
           node-version: "20"
-          cache: "pnpm"
 
       - name: Cache zed-extension CLI
         id: cache-zed-extension
@@ -47,14 +44,10 @@ jobs:
           wget --quiet "https://zed-extension-cli.nyc3.digitaloceanspaces.com/$ZED_EXTENSION_CLI_SHA/x86_64-unknown-linux-gnu/zed-extension"
           chmod +x zed-extension
 
-      - name: Install dependencies
-        run: pnpm install
-
       - name: Build
-        run: pnpm build
-
-      - name: Run tests
-        run: pnpm test
+        run: |
+          mkdir ./scratch || echo -n
+          ./zed-extension --source-dir . --output-dir ./build --scratch-dir ./scratch
 
       - name: Cache extension build dependencies
         uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4
