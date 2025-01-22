@@ -15,9 +15,8 @@ env:
   ZED_EXTENSION_CLI_SHA: b5ce8e7aa500d530389fef4cdd26f4790d013682
 
 jobs:
-  package:
+  test:
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'zed-industries'
     steps:
       - name: Checkout repo
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -63,19 +62,3 @@ jobs:
           key: cache-build-dependencies
           path: |
             ./scratch
-
-      - name: Package extensions
-        run: pnpm package-extensions
-        env:
-          SHOULD_PUBLISH: ${{ github.ref_name == 'main' }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-
-      - name: Enforce sorted `extensions.toml` and `.gitmodules`
-        run: |
-          if ! git diff --exit-code -- extensions.toml .gitmodules; then
-            echo -e "\nERROR: extensions.toml and .gitmodules are not sorted."
-            echo -e "Fix by running:\n  pnpm sort-extensions\n"
-            exit 1
-          fi
