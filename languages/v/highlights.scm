@@ -6,7 +6,8 @@
  (shebang)
 ] @comment
 
-(identifier) @variable
+
+(simple_statement) @variable
 (import_path) @variable
 
 (parameter_declaration
@@ -15,21 +16,23 @@
   name: (identifier) @function)
 (function_declaration
   receiver: (receiver)
-  name: (identifier) @method)
+  name: (identifier) @function)
 
 (short_lambda
   (reference_expression) @parameter)
 (call_expression
   name: (selector_expression
-    field: (reference_expression) @method))
+    field: (reference_expression) @function))
+(call_expression
+  name: (reference_expression) @function)
 
 (type_reference_expression) @type
 (pointer_type) @type
 (array_type) @type
 
-(field_name) @property
-(selector_expression
-  field: (reference_expression) @property)
+(simple_statement
+	(selector_expression
+  field: (reference_expression) @property))
 
 (int_literal) @number
 (interpreted_string_literal) @string
