@@ -1,7 +1,7 @@
 name = "V"
 grammar = "v"
-path_suffixes = ["v", "vv", "mod"]
-first_line_pattern = '^#![^\\n]+'
+path_suffixes = ["v", "vv", "vsh", "mod"]
+first_line_pattern = "^#!.*/(?:v|env(?: .*)? v)(?: |$)"
 line_comments = ["// "]
 autoclose_before = ";:.,=}])>"
 brackets = [
