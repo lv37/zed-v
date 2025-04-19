@@ -57,7 +57,7 @@ fn language_server_binary_path_no_fallback(
 		"lv37/v-analyzer",
 		zed::GithubReleaseOptions {
 			require_assets: true,
-			pre_release: true,
+			pre_release: false,
 		},
 	)?;
 	
@@ -93,7 +93,7 @@ fn language_server_binary_path_no_fallback(
 		}
 	}
 	selff.cached_binary_path = Some(asset_name.clone());
-	selff.current_version = asset.download_url.clone();
+	selff.current_version = release.version;
 	Ok(asset_name)
 }
 
