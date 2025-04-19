@@ -8,7 +8,7 @@ repository = "https://github.com/lv37/zed-v"
 
 [grammars.v]
 repository = "https://github.com/lv37/v-tree-sitter"
-commit = "764882164bcc91414a7cf861bfe495847f6dff87"
+commit = "8a380d4e12220748cbc0106cafd958f32ec8ecfc"
 
 [language_servers.v]
 languages = ["V"]
