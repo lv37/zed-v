@@ -130,11 +130,15 @@ impl zed::Extension for VExtension {
         language_server_id: &LanguageServerId,
         worktree: &zed::Worktree,
     ) -> Result<zed::Command> {
-        Ok(zed::Command {
+        let mut cmd = zed::Command {
             command: self.language_server_binary_path(language_server_id, worktree)?,
             args: vec![],
-            env: Default::default(),
-        })
+            env: Vec::new(),
+        };
+        cmd.env
+            .push(("VLS_URI_STRIP_FILE_SCHEME".to_string(), "1".to_string()));
+
+        Ok(cmd)
     }
 
     fn label_for_completion(
