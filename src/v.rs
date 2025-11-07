@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 use zed::{CodeLabel, CodeLabelSpan, LanguageServerId};
 use zed_extension_api::{self as zed, Result};
 
@@ -9,63 +10,95 @@ struct VExtension {
     cached_binary_path: Option<String>,
 }
 
-// ✅ 平台自动检测 + fallback 逻辑
+// ---------------------------------------------
+// ✅ 尝试从 PATH 或 ~/.vmodules/vls/vls 查找
+// ---------------------------------------------
 fn try_local_install<T>(err: T, worktree: &zed::Worktree) -> Result<String, T> {
-    // 1️⃣ 查 PATH
+    // ① 从 PATH 查找
     if let Some(path) = worktree.which("vls") {
-        println!("Using vls from PATH: {}", path);
+        println!("Using system-installed vls: {}", &path);
         return Ok(path);
     }
 
-    // 2️⃣ fallback 到 ~/.vmodules/vls/vls 或 Windows 版本
+    // ② 从 ~/.vmodules/vls/vls 查找
     let home = env::var("HOME")
         .or_else(|_| env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-
-    // ⚙️ 根据系统类型选择可执行文件名
-    #[cfg(target_os = "windows")]
-    let exe_name = "vls.exe";
-    #[cfg(not(target_os = "windows"))]
-    let exe_name = "vls";
-
-    let mut local_path = PathBuf::from(&home);
+        .unwrap_or_else(|_| ".".into());
+    let mut local_path = PathBuf::from(home);
     local_path.push(".vmodules");
     local_path.push("vls");
-    local_path.push(exe_name);
+    local_path.push(if cfg!(target_os = "windows") {
+        "vls.exe"
+    } else {
+        "vls"
+    });
 
     if fs::metadata(&local_path).map_or(false, |m| m.is_file()) {
         println!("Using vls from local path: {}", local_path.display());
         return Ok(local_path.display().to_string());
     }
 
-    // 3️⃣ 全部失败
     Err(err)
 }
 
-// 原始逻辑（保持不变）
-fn language_server_binary_path_no_fallback(
-    selff: &mut VExtension,
-    _language_server_id: &LanguageServerId,
-    _worktree: &zed::Worktree,
-) -> Result<String> {
-    if let Some(cache) = selff.cached_binary_path.clone() {
-        if fs::metadata(&cache).map_or(false, |stat| stat.is_file()) {
-            println!("Using cached vls path: {}", &cache);
-            return Ok(cache);
-        }
+// ---------------------------------------------
+// ✅ 若未找到，则执行 `v install vls` 自动安装
+// ---------------------------------------------
+fn ensure_vls_installed(language_server_id: &LanguageServerId) -> Result<String> {
+    zed::set_language_server_installation_status(
+        language_server_id,
+        &zed::LanguageServerInstallationStatus::Downloading,
+    );
+
+    println!("Installing vls via: v install vls ...");
+
+    let status = Command::new("v")
+        .args(["install", "vls"])
+        .status()
+        .map_err(|e| format!("failed to spawn 'v install vls': {e}"))?;
+
+    if !status.success() {
+        return Err("`v install vls` failed".into());
     }
 
-    Err("vls not found".to_string())
+    let home = env::var("HOME")
+        .or_else(|_| env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".into());
+    let mut path = PathBuf::from(home);
+    path.push(".vmodules");
+    path.push("vls");
+    path.push(if cfg!(target_os = "windows") {
+        "vls.exe"
+    } else {
+        "vls"
+    });
+
+    if fs::metadata(&path).map_or(false, |m| m.is_file()) {
+        zed::make_file_executable(&path.display().to_string())?;
+        println!("vls successfully installed at: {}", path.display());
+        return Ok(path.display().to_string());
+    }
+
+    Err("vls binary not found after installation".into())
 }
 
+// ---------------------------------------------
+// ✅ 综合逻辑：缓存 + 自动安装 + fallback
+// ---------------------------------------------
 impl VExtension {
     fn language_server_binary_path(
         &mut self,
         language_server_id: &LanguageServerId,
         worktree: &zed::Worktree,
     ) -> Result<String> {
-        language_server_binary_path_no_fallback(self, language_server_id, worktree)
-            .or_else(|a| try_local_install(a, worktree))
+        if let Some(cache) = self.cached_binary_path.clone() {
+            if fs::metadata(&cache).map_or(false, |stat| stat.is_file()) {
+                return Ok(cache);
+            }
+        }
+
+        try_local_install("vls not found".to_string(), worktree)
+            .or_else(|_| ensure_vls_installed(language_server_id))
             .map(|path| {
                 self.cached_binary_path = Some(path.clone());
                 path
@@ -73,11 +106,14 @@ impl VExtension {
     }
 }
 
+// ---------------------------------------------
+// ✅ Zed 扩展实现
+// ---------------------------------------------
 impl zed::Extension for VExtension {
     fn new() -> Self {
         Self {
             cached_binary_path: None,
-            current_version: "".to_string(),
+            current_version: String::new(),
         }
     }
 
@@ -87,7 +123,7 @@ impl zed::Extension for VExtension {
         worktree: &zed::Worktree,
     ) -> Result<zed::Command> {
         let path = self.language_server_binary_path(language_server_id, worktree)?;
-        println!("Starting language server: {}", &path);
+        println!("Starting VLS from: {}", &path);
         Ok(zed::Command {
             command: path,
             args: vec![],
