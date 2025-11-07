@@ -59,6 +59,7 @@
  "goto"
  "if"
  "$if"
+ "implements"
  "import"
  "in"
  "!in"

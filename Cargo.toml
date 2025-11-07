@@ -10,4 +10,7 @@ path = "src/v.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-zed_extension_api = "0.3.0"
+zed_extension_api = "<1"
+
+[profile.release]
+lto = "thin"
