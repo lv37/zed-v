@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::path::PathBuf;
 use zed::{CodeLabel, CodeLabelSpan, LanguageServerId};
 use zed_extension_api::{self as zed, Result};
 
@@ -8,7 +9,7 @@ struct VExtension {
     cached_binary_path: Option<String>,
 }
 
-// 优先查 PATH，再 fallback 到本地 ~/.vmodules/vls/vls
+// ✅ 平台自动检测 + fallback 逻辑
 fn try_local_install<T>(err: T, worktree: &zed::Worktree) -> Result<String, T> {
     // 1️⃣ 查 PATH
     if let Some(path) = worktree.which("vls") {
@@ -16,19 +17,32 @@ fn try_local_install<T>(err: T, worktree: &zed::Worktree) -> Result<String, T> {
         return Ok(path);
     }
 
-    // 2️⃣ fallback 到 ~/.vmodules/vls/vls
-    let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let local_path = format!("{}/.vmodules/vls/vls", home);
+    // 2️⃣ fallback 到 ~/.vmodules/vls/vls 或 Windows 版本
+    let home = env::var("HOME")
+        .or_else(|_| env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+
+    // ⚙️ 根据系统类型选择可执行文件名
+    #[cfg(target_os = "windows")]
+    let exe_name = "vls.exe";
+    #[cfg(not(target_os = "windows"))]
+    let exe_name = "vls";
+
+    let mut local_path = PathBuf::from(&home);
+    local_path.push(".vmodules");
+    local_path.push("vls");
+    local_path.push(exe_name);
+
     if fs::metadata(&local_path).map_or(false, |m| m.is_file()) {
-        println!("Using vls from local path: {}", &local_path);
-        return Ok(local_path);
+        println!("Using vls from local path: {}", local_path.display());
+        return Ok(local_path.display().to_string());
     }
 
     // 3️⃣ 全部失败
     Err(err)
 }
 
-// 原来的下载逻辑（可保留，但 Linux/Mac 通常没有二进制，所以不执行）
+// 原始逻辑（保持不变）
 fn language_server_binary_path_no_fallback(
     selff: &mut VExtension,
     _language_server_id: &LanguageServerId,
