@@ -10,6 +10,16 @@
 (simple_statement) @variable
 (import_path) @variable
 
+(qualified_type
+  module: (reference_expression) @variable)
+(var_definition_list) @variable
+(range
+  _ (reference_expression) @variable)
+(return_statement
+  expression_list: (expression_list) @variable)
+(const_definition
+  name: (identifier) @constant)
+
 (parameter_declaration
   name: (identifier) @parameter)
 (function_declaration
@@ -38,6 +48,16 @@
 (interpreted_string_literal) @string
 (rune_literal) @string
 (escape_sequence) @string.escape
+
+(struct_declaration
+  name: (identifier) @type)
+(enum_declaration
+  name: (identifier) @type)
+
+(struct_field_declaration
+  name: (identifier) @property)
+(enum_field_definition
+  name: (identifier) @property)
 
 [
  "as"
